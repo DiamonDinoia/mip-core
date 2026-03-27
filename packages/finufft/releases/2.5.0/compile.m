@@ -12,6 +12,12 @@ scriptDir = fileparts(mfilename('fullpath'));
 finufftSrc = fullfile(scriptDir, 'finufft_src');
 finufftMatlab = fullfile(scriptDir, 'finufft_matlab');
 buildDir = fullfile(scriptDir, 'build_mex');
+extraCFlags = strtrim(getenv('MIP_CFLAGS'));
+extraCxxFlags = strtrim(getenv('MIP_CXXFLAGS'));
+extraLdFlags = strtrim(getenv('MIP_LDFLAGS'));
+cmakeGenerator = strtrim(getenv('MIP_CMAKE_GENERATOR'));
+cmakeBuildProgram = strtrim(getenv('MIP_CMAKE_BUILD_PROGRAM'));
+externalEnvPrefix = makeExternalEnvPrefix(matlabroot, getenv('LD_LIBRARY_PATH'));
 
 % Step 1: Build FINUFFT static libraries using CMake
 fprintf('Configuring FINUFFT with CMake...\n');
@@ -19,34 +25,44 @@ if ~exist(buildDir, 'dir')
     mkdir(buildDir);
 end
 
+generatorArgs = '';
+if ~isempty(cmakeGenerator)
+    generatorArgs = sprintf(' -G "%s"', cmakeGenerator);
+end
+if ~isempty(cmakeBuildProgram)
+    generatorArgs = sprintf('%s -DCMAKE_MAKE_PROGRAM="%s"', generatorArgs, cmakeBuildProgram);
+end
+
+flagArgs = '';
+if ~isempty(extraCFlags)
+    flagArgs = sprintf('%s -DCMAKE_C_FLAGS="%s"', flagArgs, extraCFlags);
+end
+if ~isempty(extraCxxFlags)
+    flagArgs = sprintf('%s -DCMAKE_CXX_FLAGS="%s"', flagArgs, extraCxxFlags);
+end
+
 cmakeCmd = sprintf([ ...
-    'cmake "%s" -B "%s"' ...
+    '%s cmake "%s" -B "%s"' ...
+    '%s' ...
     ' -DCMAKE_BUILD_TYPE=Release' ...
     ' -DFINUFFT_USE_OPENMP=OFF' ...
     ' -DFINUFFT_USE_DUCC0=ON' ...
     ' -DFINUFFT_STATIC_LINKING=ON' ...
+    ' -DFINUFFT_POSITION_INDEPENDENT_CODE=ON' ...
     ' -DFINUFFT_BUILD_TESTS=OFF' ...
     ' -DFINUFFT_BUILD_EXAMPLES=OFF' ...
     ' -DFINUFFT_ENABLE_INSTALL=OFF' ...
-    ' -DCMAKE_C_FLAGS="-fPIC"' ...
-    ' -DCMAKE_CXX_FLAGS="-fPIC"'], ...
-    finufftSrc, buildDir);
+    ' -DFINUFFT_ARCH_FLAGS=""' ...
+    '%s'], ...
+    externalEnvPrefix, finufftSrc, buildDir, generatorArgs, flagArgs);
 
-[status, output] = system(cmakeCmd);
-fprintf('%s', output);
-if status ~= 0
-    error('CMake configuration failed (exit code %d)', status);
-end
+runExternalCommand(cmakeCmd, 'CMake configuration');
 
 % Build static library
 fprintf('Building FINUFFT static library...\n');
 nproc = maxNumCompThreads;
-buildCmd = sprintf('cmake --build "%s" --target finufft -j%d', buildDir, nproc);
-[status, output] = system(buildCmd);
-fprintf('%s', output);
-if status ~= 0
-    error('CMake build failed (exit code %d)', status);
-end
+buildCmd = sprintf('%s cmake --build "%s" --target finufft -j%d', externalEnvPrefix, buildDir, nproc);
+runExternalCommand(buildCmd, 'CMake build');
 
 % Step 2: Find static libraries
 libFinufft = fullfile(buildDir, 'src', 'libfinufft.a');
@@ -89,6 +105,9 @@ end
 if isunix && ~ismac
     mexArgs{end+1} = 'LDFLAGS=$LDFLAGS -static-libstdc++ -static-libgcc';
 end
+if ~isempty(extraLdFlags)
+    mexArgs{end+1} = ['LDFLAGS=$LDFLAGS ' extraLdFlags];
+end
 
 % Output MEX file into finufft_matlab/ (which is on the addpath)
 mexArgs{end+1} = '-output';
@@ -97,3 +116,49 @@ mexArgs{end+1} = fullfile(finufftMatlab, 'finufft');
 mex(mexArgs{:});
 
 fprintf('=== FINUFFT MEX compilation complete ===\n');
+
+function envPrefix = makeExternalEnvPrefix(matlabRoot, currentLdLibraryPath)
+% Strip MATLAB's runtime libraries before invoking host build tools.
+cleanLdLibraryPath = stripMatlabPaths(currentLdLibraryPath, matlabRoot);
+if isempty(cleanLdLibraryPath)
+    envPrefix = 'env -u LD_PRELOAD -u LD_LIBRARY_PATH';
+else
+    envPrefix = sprintf('env -u LD_PRELOAD LD_LIBRARY_PATH=%s', shellQuote(cleanLdLibraryPath));
+end
+end
+
+function cleanLdLibraryPath = stripMatlabPaths(ldLibraryPath, matlabRoot)
+if isempty(ldLibraryPath)
+    cleanLdLibraryPath = '';
+    return;
+end
+
+pathEntries = strsplit(ldLibraryPath, pathsep);
+keepEntries = {};
+normalizedMatlabRoot = strrep(matlabRoot, '\', '/');
+for i = 1:numel(pathEntries)
+    entry = strtrim(pathEntries{i});
+    if isempty(entry)
+        continue;
+    end
+    normalizedEntry = strrep(entry, '\', '/');
+    if contains(normalizedEntry, normalizedMatlabRoot)
+        continue;
+    end
+    keepEntries{end + 1} = entry; %#ok<AGROW>
+end
+
+cleanLdLibraryPath = strjoin(keepEntries, pathsep);
+end
+
+function quoted = shellQuote(text)
+quoted = ['''' strrep(text, '''', '''"''"''') ''''];
+end
+
+function runExternalCommand(command, stepName)
+[status, output] = system(command);
+fprintf('%s', output);
+if status ~= 0
+    error('%s failed (exit code %d)', stepName, status);
+end
+end
