@@ -228,8 +228,10 @@ def build_mhl_filename(package_data: Dict[str, Any], variant_metadata: Dict[str,
 
 
 def _match_optional_dimension(allowed_values: Any, selected_value: Optional[str]) -> bool:
+    if allowed_values is None:
+        return True
     if selected_value is None:
-        return allowed_values in (None, [], ())
+        return not allowed_values
     if not allowed_values:
         return False
     return selected_value in allowed_values

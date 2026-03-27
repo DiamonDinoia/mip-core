@@ -18,6 +18,14 @@ concurrency:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cpu_level: [x86_64_v1, x86_64_v2, x86_64_v3, x86_64_v4]
+
+    env:
+      BUILD_ARCHITECTURE: linux_x86_64
+      BUILD_CPU_LEVEL: ${{ matrix.cpu_level }}
 
     steps:
       - name: Install and switch to GCC 10
@@ -53,33 +61,24 @@ jobs:
           pip install requests pyyaml
 
       - name: Prepare packages
-        env:
-          BUILD_ARCHITECTURE: linux_x86_64
         run: |
           python scripts/prepare_packages.py
 
       - name: Run build scripts
-        env:
-          BUILD_ARCHITECTURE: linux_x86_64
         run: |
           python scripts/build_packages.py
 
       - name: Compile packages
-        env:
-          BUILD_ARCHITECTURE: linux_x86_64
         uses: matlab-actions/run-command@v2
         with:
           command: "cd scripts; compile_packages"
 
       - name: Bundle packages
-        env:
-          BUILD_ARCHITECTURE: linux_x86_64
         run: |
           python scripts/bundle_packages.py
 
       - name: Upload packages
         env:
-          BUILD_ARCHITECTURE: linux_x86_64
           GH_TOKEN: ${{ github.token }}
         run: |
           python scripts/upload_packages.py
