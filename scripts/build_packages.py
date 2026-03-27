@@ -3,11 +3,10 @@
 Run shell-based build scripts for prepared packages.
 
 This script handles non-MATLAB build steps (e.g., emscripten/wasm builds).
-It discovers .dir directories in build/prepared/, reads their corresponding
-prepare.yaml to check for a build_script field, and executes matching shell
-scripts.
+It discovers .dir directories in build/prepared/, reads mip.json to check for
+a build_script field, and executes matching shell scripts.
 
-This runs BEFORE compile_packages.m (which handles .m compile scripts).
+This runs BEFORE compile_packages.m (which handles MATLAB compile_script entries).
 """
 
 import os
@@ -16,11 +15,10 @@ import json
 import shutil
 import subprocess
 import time
-import yaml
 import argparse
 
 
-def build_all_packages(prepared_dir: str, packages_dir: str, architecture: str) -> bool:
+def build_all_packages(prepared_dir: str) -> bool:
     """Run build scripts for all prepared packages."""
     if not os.path.exists(prepared_dir):
         print(f"Prepared packages directory not found: {prepared_dir}")
@@ -40,36 +38,18 @@ def build_all_packages(prepared_dir: str, packages_dir: str, architecture: str) 
     packages_with_build = 0
     for dir_name in sorted(dir_entries):
         dir_path = os.path.join(prepared_dir, dir_name)
-
-        # Extract package name and version from directory name (format: name-version-arch.dir)
-        base_name = dir_name[:-4]  # Remove .dir
-        parts = base_name.split('-')
-        package_name = parts[0]
-        release_version = parts[1] if len(parts) > 1 else 'unspecified'
-
-        # Find prepare.yaml
-        yaml_path = os.path.join(packages_dir, package_name, 'releases', release_version, 'prepare.yaml')
-        if not os.path.exists(yaml_path):
-            print(f"\n{dir_name}: prepare.yaml not found at {yaml_path}, skipping")
+        mip_json_path = os.path.join(dir_path, 'mip.json')
+        if not os.path.exists(mip_json_path):
+            print(f"\n{dir_name}: mip.json not found, skipping")
             continue
 
-        with open(yaml_path, 'r') as f:
-            yaml_data = yaml.safe_load(f)
+        with open(mip_json_path, 'r') as f:
+            mip_data = json.load(f)
 
-        defaults = yaml_data.get('defaults', {})
-        builds = yaml_data.get('builds', [])
-
-        # Find matching build and resolve build_script
-        build_script = None
-        for build in builds:
-            archs = build.get('architectures', [])
-            if architecture in archs or ('any' in archs and architecture == 'linux_x86_64'):
-                # Resolve: build overrides defaults
-                build_script = build.get('build_script', defaults.get('build_script'))
-                break
+        build_script = mip_data.get('build_script')
 
         if not build_script:
-            print(f"\n{dir_name}: No build_script for ARCHITECTURE={architecture}")
+            print(f"\n{dir_name}: No build_script in mip.json")
             continue
 
         build_script_path = os.path.join(dir_path, build_script)
@@ -80,15 +60,9 @@ def build_all_packages(prepared_dir: str, packages_dir: str, architecture: str) 
         packages_with_build += 1
         print(f"\n{dir_name}: Running {build_script}...")
 
-        # Read mip.json for build_env and build_only_sources
-        mip_json_path = os.path.join(dir_path, 'mip.json')
-        build_only_sources = []
-        build_env_map = {}
-        if os.path.exists(mip_json_path):
-            with open(mip_json_path, 'r') as f:
-                mip_data = json.load(f)
-            build_only_sources = mip_data.get('build_only_sources', [])
-            build_env_map = mip_data.get('build_env', {})
+        build_only_sources = mip_data.get('build_only_sources', [])
+        build_env_map = mip_data.get('build_env', {})
+        compiler_env_map = mip_data.get('compiler_env', {})
 
         # Set up environment with build_env (values are paths relative to dir_path)
         build_env = os.environ.copy()
@@ -96,6 +70,9 @@ def build_all_packages(prepared_dir: str, packages_dir: str, architecture: str) 
             abs_path = os.path.abspath(os.path.join(dir_path, rel_path))
             build_env[env_var] = abs_path
             print(f"  Setting {env_var}={abs_path}")
+        for env_var, value in compiler_env_map.items():
+            build_env[env_var] = str(value)
+            print(f"  Setting {env_var}={value}")
 
         build_start = time.time()
         try:
@@ -124,7 +101,7 @@ def build_all_packages(prepared_dir: str, packages_dir: str, architecture: str) 
         if os.path.exists(mip_json_path):
             with open(mip_json_path, 'r') as f:
                 mip_data = json.load(f)
-            mip_data['compile_duration'] = round(build_duration, 2)
+            mip_data['build_duration'] = round(build_duration, 2)
             mip_data.pop('build_only_sources', None)
             mip_data.pop('build_env', None)
             with open(mip_json_path, 'w') as f:
@@ -148,19 +125,15 @@ def main():
 
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     prepared_dir = args.prepared_dir or os.path.join(project_root, 'build', 'prepared')
-    packages_dir = os.path.join(project_root, 'packages')
-    architecture = os.environ.get('BUILD_ARCHITECTURE', 'any')
-
     print("Starting build script execution...")
-    print(f"BUILD_ARCHITECTURE: {architecture}")
 
-    success = build_all_packages(prepared_dir, packages_dir, architecture)
+    success = build_all_packages(prepared_dir)
 
     if success:
-        print("\n✓ All build scripts completed successfully")
+        print("\nAll build scripts completed successfully")
         return 0
     else:
-        print("\n✗ Build script execution failed")
+        print("\nBuild script execution failed")
         return 1
 
 

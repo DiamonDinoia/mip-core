@@ -26,6 +26,14 @@ from typing import List, Dict, Any, Optional
 
 import argparse
 
+from build_targets import (
+    get_build_context_from_env,
+    get_variant_metadata,
+    resolve_build_architecture,
+    build_mhl_filename,
+    BuildContext,
+)
+
 
 def download_and_extract_zip(url: str, destination: str):
     """
@@ -306,13 +314,14 @@ class PackagePreparer:
     def __init__(self, dry_run=False, force=False, output_dir=None):
         self.dry_run = dry_run
         self.force = force
-        
+        self.build_context = get_build_context_from_env()
+
         if output_dir:
             self.output_dir = output_dir
         else:
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             self.output_dir = os.path.join(project_root, 'build', 'prepared')
-        
+
         if not self.dry_run:
             os.makedirs(self.output_dir, exist_ok=True)
     
@@ -446,7 +455,8 @@ class PackagePreparer:
             os.chdir(original_dir)
     
     def _create_mip_json(self, mhl_dir: str, yaml_data: Dict[str, Any],
-                        resolved_config: Dict[str, Any], architecture: str,
+                        resolved_config: Dict[str, Any],
+                        variant_metadata: Dict[str, Any],
                         exposed_symbols: List[str],
                         prepare_duration: float, mhl_filename: str, source_hash: str):
         """Create mip.json metadata file."""
@@ -463,6 +473,17 @@ class PackagePreparer:
         # Collect build_env for build_packages.py (env var name -> relative path)
         build_env = resolved_config.get('build_env', {})
 
+        # Static metadata from variant (cpu_level, compiler_family, etc.)
+        static_metadata: Dict[str, Any] = {
+            'architecture': variant_metadata['architecture'],
+        }
+        for key in (
+            'cpu_level', 'compiler_family', 'compiler_version',
+            'matlab_release',
+        ):
+            if key in variant_metadata:
+                static_metadata[key] = variant_metadata[key]
+
         mip_data = {
             'name': yaml_data['name'],
             'description': yaml_data['description'],
@@ -472,7 +493,7 @@ class PackagePreparer:
             'homepage': yaml_data.get('homepage', ''),
             'repository': yaml_data.get('repository', ''),
             'license': yaml_data.get('license', ''),
-            'architecture': architecture,
+            **static_metadata,
             'build_on': resolved_config.get('build_on', 'any'),
             'usage_examples': yaml_data.get('usage_examples', []),
             'exposed_symbols': exposed_symbols,
@@ -486,7 +507,11 @@ class PackagePreparer:
             mip_data['build_only_sources'] = build_only_sources
         if build_env:
             mip_data['build_env'] = build_env
-        
+        # Compiler environment for compile_packages.m / build_packages.py
+        compiler_env = variant_metadata.get('compiler_env')
+        if compiler_env:
+            mip_data['compiler_env'] = compiler_env
+
         mip_json_path = os.path.join(mhl_dir, 'mip.json')
         with open(mip_json_path, 'w') as f:
             json.dump(mip_data, f, indent=2)
@@ -530,24 +555,22 @@ class PackagePreparer:
             with open(yaml_path, 'r') as f:
                 yaml_data = yaml.safe_load(f)
 
-            # Get BUILD_ARCHITECTURE from environment
-            architecture_env = os.environ.get('BUILD_ARCHITECTURE', 'any')
-
             # Get defaults section
             defaults = yaml_data.get('defaults', {})
 
-            # Find matching (build, architecture) pairs
+            # Find matching (build, architecture) pairs using build_targets
             builds = yaml_data.get('builds', [])
             matching_pairs: List[tuple] = []  # list of (build_entry, matched_architecture)
             for b in builds:
-                archs = b.get('architectures', [])
-                if architecture_env in archs:
-                    matching_pairs.append((b, architecture_env))
-                elif 'any' in archs and architecture_env == 'linux_x86_64':
-                    matching_pairs.append((b, 'any'))
+                matched = resolve_build_architecture(b, self.build_context)
+                if matched is not None:
+                    matching_pairs.append((b, matched))
 
             if not matching_pairs:
-                print(f"  No builds match ARCHITECTURE={architecture_env}, skipping")
+                print(
+                    f"  No builds match ARCHITECTURE={self.build_context.architecture},"
+                    f" CPU_LEVEL={self.build_context.cpu_level or 'unset'}; skipping"
+                )
                 return True
 
             # check that version in yaml matches release_version
@@ -565,9 +588,18 @@ class PackagePreparer:
                 # Resolve config: defaults merged with build overrides
                 resolved_config = resolve_build_config(defaults, build)
 
+                # Get variant metadata (cpu_level, compiler_env, etc.)
+                variant_metadata = get_variant_metadata(
+                    matched_architecture, self.build_context, resolved_config
+                )
+
                 # Generate filename
-                mhl_filename = self._get_mhl_filename(yaml_data, matched_architecture)
+                mhl_filename = build_mhl_filename(yaml_data, variant_metadata)
                 wheel_name = mhl_filename[:-4]  # Remove .mhl
+                print(
+                    f"  Variant: architecture={variant_metadata['architecture']}"
+                    f", cpu_level={variant_metadata.get('cpu_level', 'none')}"
+                )
                 print(f"  Wheel name: {wheel_name}")
 
                 # Check if exists
@@ -605,7 +637,7 @@ class PackagePreparer:
                     print(f"  Creating mip.json...")
                     self._create_mip_json(
                         output_dir_path, yaml_data, resolved_config,
-                        matched_architecture, exposed_symbols,
+                        variant_metadata, exposed_symbols,
                         prepare_duration, mhl_filename, source_hash
                     )
 
@@ -679,7 +711,8 @@ class PackagePreparer:
         
         print(f"Found {len(package_dirs)} package(s)")
         print(f"Output directory: {self.output_dir}")
-        print(f"ARCHITECTURE: {os.environ.get('BUILD_ARCHITECTURE', 'any')}")
+        print(f"ARCHITECTURE: {self.build_context.architecture}")
+        print(f"CPU_LEVEL: {self.build_context.cpu_level or 'unset'}")
 
         # Prepare each package
         all_success = True
@@ -754,7 +787,8 @@ def main():
         
         print(f"Preparing single package: {args.package}")
         print(f"Output directory: {preparer.output_dir}")
-        print(f"ARCHITECTURE: {os.environ.get('BUILD_ARCHITECTURE', 'any')}")
+        print(f"ARCHITECTURE: {preparer.build_context.architecture}")
+        print(f"CPU_LEVEL: {preparer.build_context.cpu_level or 'unset'}")
 
         success = preparer.prepare_package_dir(package_dir, release=args.release)
     else:
