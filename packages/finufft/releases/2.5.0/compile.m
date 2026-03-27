@@ -12,9 +12,6 @@ scriptDir = fileparts(mfilename('fullpath'));
 finufftSrc = fullfile(scriptDir, 'finufft_src');
 finufftMatlab = fullfile(scriptDir, 'finufft_matlab');
 buildDir = fullfile(scriptDir, 'build_mex');
-extraCFlags = strtrim(getenv('MIP_CFLAGS'));
-extraCxxFlags = strtrim(getenv('MIP_CXXFLAGS'));
-extraLdFlags = strtrim(getenv('MIP_LDFLAGS'));
 cmakeGenerator = strtrim(getenv('MIP_CMAKE_GENERATOR'));
 cmakeBuildProgram = strtrim(getenv('MIP_CMAKE_BUILD_PROGRAM'));
 externalEnvPrefix = makeExternalEnvPrefix(matlabroot, getenv('LD_LIBRARY_PATH'));
@@ -33,14 +30,6 @@ if ~isempty(cmakeBuildProgram)
     generatorArgs = sprintf('%s -DCMAKE_MAKE_PROGRAM="%s"', generatorArgs, cmakeBuildProgram);
 end
 
-flagArgs = '';
-if ~isempty(extraCFlags)
-    flagArgs = sprintf('%s -DCMAKE_C_FLAGS="%s"', flagArgs, extraCFlags);
-end
-if ~isempty(extraCxxFlags)
-    flagArgs = sprintf('%s -DCMAKE_CXX_FLAGS="%s"', flagArgs, extraCxxFlags);
-end
-
 cmakeCmd = sprintf([ ...
     '%s cmake "%s" -B "%s"' ...
     '%s' ...
@@ -52,9 +41,8 @@ cmakeCmd = sprintf([ ...
     ' -DFINUFFT_BUILD_TESTS=OFF' ...
     ' -DFINUFFT_BUILD_EXAMPLES=OFF' ...
     ' -DFINUFFT_ENABLE_INSTALL=OFF' ...
-    ' -DFINUFFT_ARCH_FLAGS=""' ...
-    '%s'], ...
-    externalEnvPrefix, finufftSrc, buildDir, generatorArgs, flagArgs);
+    ' -DFINUFFT_ARCH_FLAGS=""'], ...
+    externalEnvPrefix, finufftSrc, buildDir, generatorArgs);
 
 runExternalCommand(cmakeCmd, 'CMake configuration');
 
@@ -104,9 +92,6 @@ end
 % Platform-specific flags
 if isunix && ~ismac
     mexArgs{end+1} = 'LDFLAGS=$LDFLAGS -static-libstdc++ -static-libgcc';
-end
-if ~isempty(extraLdFlags)
-    mexArgs{end+1} = ['LDFLAGS=$LDFLAGS ' extraLdFlags];
 end
 
 % Output MEX file into finufft_matlab/ (which is on the addpath)

@@ -160,10 +160,10 @@ def get_variant_metadata(
                 "MIP_CPU_LEVEL": context.cpu_level,
                 "MIP_MARCH": march,
                 "MIP_MTUNE": profile["mtune"],
-                "MIP_CFLAGS": compiler_flags["cflags"],
-                "MIP_CXXFLAGS": compiler_flags["cxxflags"],
-                "MIP_FFLAGS": compiler_flags["fflags"],
-                "MIP_LDFLAGS": compiler_flags["ldflags"],
+                "CFLAGS": compiler_flags["cflags"],
+                "CXXFLAGS": compiler_flags["cxxflags"],
+                "FFLAGS": compiler_flags["fflags"],
+                "LDFLAGS": compiler_flags["ldflags"],
             }
         )
 
@@ -181,8 +181,8 @@ def get_variant_metadata(
         compiler_env.update(
             {
                 "MIP_CPU_LEVEL": context.cpu_level,
-                "MIP_CL_FLAGS": compiler_flags["cl_flags"],
-                "MIP_LINK_FLAGS": compiler_flags["link_flags"],
+                "CL": compiler_flags["cl_flags"],
+                "_LINK_": compiler_flags["link_flags"],
             }
         )
 
