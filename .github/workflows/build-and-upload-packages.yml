@@ -83,6 +83,61 @@ jobs:
         run: |
           python scripts/upload_packages.py
 
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cpu_level: [x86_64_v1, x86_64_v2, x86_64_v3, x86_64_v4]
+
+    env:
+      BUILD_ARCHITECTURE: windows_x86_64
+      BUILD_CPU_LEVEL: ${{ matrix.cpu_level }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pyyaml
+
+      - name: Prepare packages
+        run: |
+          python scripts/prepare_packages.py
+
+      - name: Run build scripts
+        run: |
+          python scripts/build_packages.py
+
+      - name: Compile packages
+        uses: matlab-actions/run-command@v2
+        with:
+          command: "cd scripts; compile_packages"
+
+      - name: Bundle packages
+        run: |
+          python scripts/bundle_packages.py
+
+      - name: Upload packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/upload_packages.py
+
   build-macos-intel:
     runs-on: macos-15-intel
 
@@ -408,7 +463,7 @@ jobs:
 
   assemble-index:
     runs-on: ubuntu-latest
-    needs: [build-linux, build-macos, build-macos-intel, build-numbl-wasm, build-numbl-linux, build-numbl-macos-intel, build-numbl-macos]
+    needs: [build-linux, build-windows, build-macos, build-macos-intel, build-numbl-wasm, build-numbl-linux, build-numbl-macos-intel, build-numbl-macos]
 
     steps:
       - name: Checkout repository
