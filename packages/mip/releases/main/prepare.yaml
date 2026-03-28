@@ -1,6 +1,6 @@
 name: mip
 description: "MIP package manager for MATLAB"
-version: "0.0.1"
+version: "main"
 dependencies: []
 homepage: "https://github.com/mip-org/mip-package-manager"
 repository: "https://github.com/mip-org/mip-package-manager"
@@ -13,6 +13,7 @@ defaults:
       url: "https://github.com/mip-org/mip-package-manager"
       subdirectory: "matlab"
       destination: "mip"
+      branch: "main"
   addpaths:
     - path: "mip"
 
