@@ -392,6 +392,12 @@ class PackagePreparer:
                 elif 'clone_git' in source:
                     config = source['clone_git']
                     clone_git_repository(config['url'], config['destination'], config.get('subdirectory'))
+                    # Remove specified directories after cloning
+                    for dir_name in config.get('remove_dirs', []):
+                        dir_path = os.path.join(config['destination'], dir_name)
+                        if os.path.isdir(dir_path):
+                            shutil.rmtree(dir_path)
+                            print(f"    Removed directory: {dir_path}")
 
             # Compute all paths (addpaths is now a sibling of prepare, not nested inside it)
             addpaths_config = resolved_config.get('addpaths', [])

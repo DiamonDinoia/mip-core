@@ -9,11 +9,14 @@ license: "BSD-3-Clause"
 defaults:
   release_number: 50
   prepare:
-    download_zip:
-      url: "https://github.com/chebfun/chebfun/archive/master.zip"
+    clone_git:
+      url: "https://github.com/chebfun/chebfun"
       destination: "chebfun"
+      remove_dirs:
+        - tests
+        - chebguiDemos
   addpaths:
-    - path: "chebfun/chebfun-master"
+    - path: "chebfun"
 
 builds:
   - architectures: [any]
