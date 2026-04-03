@@ -10,7 +10,7 @@ fprintf('=== Bundle Packages ===\n');
 preparedDir = fullfile(pwd, 'build', 'prepared');
 outputDir = fullfile(pwd, 'build', 'bundled');
 
-architecture = os.environ.get('BUILD_ARCHITECTURE')
+architecture = getenv('BUILD_ARCHITECTURE');
 if isempty(architecture)
     % err
     error('mip:missingArchitecture', 'Environment variable BUILD_ARCHITECTURE is not set');
