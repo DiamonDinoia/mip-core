@@ -61,6 +61,8 @@ jobs:
 
       - name: Bundle packages with mip
         uses: matlab-actions/run-command@v2
+        env:
+          BUILD_ARCHITECTURE: linux_x86_64
         with:
           command: "addpath('mip-package-manager'); addpath('scripts'); bundle_packages"
 
@@ -108,6 +110,8 @@ jobs:
 
       - name: Bundle packages with mip
         uses: matlab-actions/run-command@v2
+        env:
+          BUILD_ARCHITECTURE: macos_x86_64
         with:
           command: "addpath('mip-package-manager'); addpath('scripts'); bundle_packages"
 
@@ -155,6 +159,8 @@ jobs:
 
       - name: Bundle packages with mip
         uses: matlab-actions/run-command@v2
+        env:
+          BUILD_ARCHITECTURE: macos_arm64
         with:
           command: "addpath('mip-package-manager'); addpath('scripts'); bundle_packages"
 
@@ -202,6 +208,8 @@ jobs:
 
       - name: Bundle packages with mip
         uses: matlab-actions/run-command@v2
+        env:
+          BUILD_ARCHITECTURE: numbl_wasm
         with:
           command: "addpath('mip-package-manager'); addpath('scripts'); bundle_packages"
 
@@ -254,6 +262,8 @@ jobs:
 
       - name: Bundle packages with mip
         uses: matlab-actions/run-command@v2
+        env:
+          BUILD_ARCHITECTURE: numbl_linux_x86_64
         with:
           command: "addpath('mip-package-manager'); addpath('scripts'); bundle_packages"
 
@@ -298,6 +308,8 @@ jobs:
 
       - name: Bundle packages with mip
         uses: matlab-actions/run-command@v2
+        env:
+          BUILD_ARCHITECTURE: numbl_macos_x86_64
         with:
           command: "addpath('mip-package-manager'); addpath('scripts'); bundle_packages"
 
@@ -342,6 +354,8 @@ jobs:
 
       - name: Bundle packages with mip
         uses: matlab-actions/run-command@v2
+        env:
+          BUILD_ARCHITECTURE: numbl_macos_arm64
         with:
           command: "addpath('mip-package-manager'); addpath('scripts'); bundle_packages"
 
