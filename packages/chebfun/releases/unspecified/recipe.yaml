@@ -1,0 +1,3 @@
+source:
+  git: "https://github.com/chebfun/chebfun"
+  remove_dirs: [tests, chebguiDemos]

@@ -1,0 +1,15 @@
+name: finufft
+description: "FINUFFT nonuniform FFT"
+version: "2.5.0"
+license: "Apache-2.0"
+homepage: "https://finufft.readthedocs.io"
+repository: "https://github.com/flatironinstitute/finufft"
+dependencies: []
+
+addpaths:
+  - path: "matlab"
+
+builds:
+  - architectures: [linux_x86_64, macos_x86_64]
+    release_number: 9
+    compile_script: compile.m

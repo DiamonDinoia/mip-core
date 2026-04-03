@@ -1,15 +1,10 @@
-% Add Homebrew path so that gfortran can be found below
-setenv('PATH', ['/opt/homebrew/bin:' getenv('PATH')])
-
 % Compile MEX files for fmm2d
+% compile.m runs with cwd set to the package source root
+
+% Add Homebrew path so that gfortran can be found on macOS
+setenv('PATH', ['/opt/homebrew/bin:' getenv('PATH')]);
+
 fprintf('Compiling fmm2d MEX files...\n');
-
-% Get the fmm2d directory
-fmm2droot = fullfile(fileparts(mfilename('fullpath')), 'fmm2d');
-
-% Change to kdtree directory
-orig = pwd;
-cd(fmm2droot);
 
 % Set up gfortran compiler
 make_inc = {
@@ -23,10 +18,9 @@ make_inc = {
 writelines(make_inc, 'make.inc');
 
 % Make the static and dynamic libraries
-!make lib
+system('make lib');
 
-% Build the MEX file using the static library
-!make matlab
+% Build the MEX file
+system('make matlab');
 
-% Return to original directory
-cd(orig);
+fprintf('fmm2d MEX compilation completed.\n');
