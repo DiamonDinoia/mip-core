@@ -23,8 +23,8 @@ cmakeArgs = { ...
     ' -DFINUFFT_ENABLE_INSTALL=OFF'};
 
 if ispc
-    % On Windows with MSVC, use static runtime to avoid redistributable deps
-    cmakeArgs{end+1} = ' -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded';
+    % On Windows with MSVC, must use dynamic runtime (/MD) to match MATLAB's MEX
+    cmakeArgs{end+1} = ' -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL';
     cmakeArgs{end+1} = ' -DCMAKE_POLICY_DEFAULT_CMP0091=NEW';
 else
     cmakeArgs{end+1} = ' -DCMAKE_C_FLAGS="-fPIC"';
