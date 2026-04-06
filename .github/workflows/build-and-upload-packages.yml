@@ -152,6 +152,9 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      - name: Install system dependencies
+        run: brew install fftw
+
       - name: Make alias for gfortran
         run: |
           gfortran-15 --version

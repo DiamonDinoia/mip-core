@@ -12,15 +12,27 @@ if ~exist(buildDir, 'dir')
     mkdir(buildDir);
 end
 
+% Use FFTW instead of DUCC0 on macOS ARM64 (Apple Clang crashes compiling ducc0 templates)
+use_fftw = ismac && strcmp(computer('arch'), 'maca64');
+if use_fftw
+    ducc0_flag = 'OFF';
+else
+    ducc0_flag = 'ON';
+end
+
 cmakeArgs = { ...
     sprintf('cmake "%s" -B "%s"', srcRoot, buildDir), ...
     ' -DCMAKE_BUILD_TYPE=Release', ...
     ' -DFINUFFT_USE_OPENMP=OFF', ...
-    ' -DFINUFFT_USE_DUCC0=ON', ...
+    sprintf(' -DFINUFFT_USE_DUCC0=%s', ducc0_flag), ...
     ' -DFINUFFT_STATIC_LINKING=ON', ...
     ' -DFINUFFT_BUILD_TESTS=OFF', ...
     ' -DFINUFFT_BUILD_EXAMPLES=OFF', ...
     ' -DFINUFFT_ENABLE_INSTALL=OFF'};
+
+if use_fftw
+    cmakeArgs{end+1} = ' -DCMAKE_PREFIX_PATH=/opt/homebrew';
+end
 
 if ispc
     % On Windows with MSVC, must use dynamic runtime (/MD) to match MATLAB's MEX
@@ -107,6 +119,13 @@ if ispc
     mexArgs{end+1} = 'COMPFLAGS=$COMPFLAGS /O2';
 elseif isunix && ~ismac
     mexArgs{end+1} = 'LDFLAGS=$LDFLAGS -static-libstdc++ -static-libgcc';
+end
+
+% Link FFTW when not using DUCC0
+if use_fftw
+    mexArgs{end+1} = '-L/opt/homebrew/lib';
+    mexArgs{end+1} = '-lfftw3';
+    mexArgs{end+1} = '-lfftw3f';
 end
 
 % Output MEX file into the matlab/ directory (which is on the addpath)
