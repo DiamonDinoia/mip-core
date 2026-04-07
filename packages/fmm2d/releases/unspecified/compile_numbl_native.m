@@ -4,8 +4,10 @@
 
 fprintf('=== Compiling fmm2d for numbl native ===\n');
 
-% Add Homebrew path so that gfortran can be found on macOS.
-setenv('PATH', ['/opt/homebrew/bin:' getenv('PATH')]);
+% Add Homebrew paths so that gfortran can be found on macOS.
+% /opt/homebrew/bin is the ARM brew location, /usr/local/bin is the
+% Intel brew (and the default GitHub Actions Intel-runner brew prefix).
+setenv('PATH', ['/opt/homebrew/bin:/usr/local/bin:' getenv('PATH')]);
 
 scriptPath = fullfile(pwd, 'matlab', 'numbl', 'build_native.sh');
 if ~exist(scriptPath, 'file')
