@@ -8,10 +8,25 @@ dependencies: []
 
 addpaths:
   - path: "matlab"
-
-release_number: 101
+  # matlab/numbl comes after matlab so the rfmm2d.m override takes priority
+  - path: "matlab/numbl"
 
 builds:
   - architectures: [linux_x86_64, macos_x86_64, macos_arm64]
+    release_number: 101
     compile_script: compile.m
     test_script: test.m
+    addpaths:
+      - path: "matlab"
+  - architectures: [numbl_wasm]
+    release_number: 1
+    compile_script: compile_numbl_wasm.m
+    test_script: test_numbl.m
+  - architectures: [numbl_linux_x86_64]
+    release_number: 1
+    compile_script: compile_numbl_native.m
+    test_script: test_numbl.m
+  - architectures: [numbl_macos_x86_64]
+    release_number: 1
+    compile_script: compile_numbl_native.m
+    test_script: test_numbl.m
