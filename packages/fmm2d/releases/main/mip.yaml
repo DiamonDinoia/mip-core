@@ -21,12 +21,12 @@ builds:
   - architectures: [numbl_wasm]
     release_number: 1
     compile_script: compile_numbl_wasm.m
-    test_script: test_numbl.m
+    test_script: test.m
   - architectures: [numbl_linux_x86_64]
     release_number: 2
     compile_script: compile_numbl_native.m
-    test_script: test_numbl.m
+    test_script: test.m
   - architectures: [numbl_macos_x86_64]
     release_number: 2
     compile_script: compile_numbl_native.m
-    test_script: test_numbl.m
+    test_script: test.m
